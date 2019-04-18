@@ -26,10 +26,13 @@ import com.netflix.spinnaker.halyard.config.model.v1.canary.google.GoogleCanaryA
 import com.netflix.spinnaker.halyard.config.model.v1.canary.google.GoogleCanaryServiceIntegration;
 import com.netflix.spinnaker.halyard.config.model.v1.canary.prometheus.PrometheusCanaryAccount;
 import com.netflix.spinnaker.halyard.config.model.v1.canary.prometheus.PrometheusCanaryServiceIntegration;
+import com.netflix.spinnaker.halyard.config.model.v1.canary.signalfx.SignalfxCanaryAccount;
+import com.netflix.spinnaker.halyard.config.model.v1.canary.signalfx.SignalfxCanaryServiceIntegration;
 import com.netflix.spinnaker.halyard.config.model.v1.node.DeploymentConfiguration;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.SpinnakerArtifact;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.SpinnakerRuntimeSettings;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service.ServiceSettings;
+import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service.SpinnakerService.Type;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.springframework.stereotype.Component;
@@ -46,6 +49,11 @@ public class KayentaProfileFactory extends SpringProfileFactory {
   }
 
   @Override
+  public String getMinimumSecretDecryptionVersion(String deploymentName) {
+    return "0.6.2";
+  }
+
+  @Override
   protected void setProfile(Profile profile, DeploymentConfiguration deploymentConfiguration, SpinnakerRuntimeSettings endpoints) {
     super.setProfile(profile, deploymentConfiguration, endpoints);
     profile.appendContents(profile.getBaseContents());
@@ -54,8 +62,8 @@ public class KayentaProfileFactory extends SpringProfileFactory {
 
     if (canary.isEnabled()) {
       List<String> files = new ArrayList<>(backupRequiredFiles(canary, deploymentConfiguration.getName()));
-      KayentaConfigWrapper kayentaConfig = new KayentaConfigWrapper(endpoints.getServices().getKayenta(), canary);
-      profile.appendContents(yamlToString(kayentaConfig)).setRequiredFiles(files);
+      KayentaConfigWrapper kayentaConfig = new KayentaConfigWrapper(endpoints.getServiceSettings(Type.KAYENTA), canary);
+      profile.appendContents(yamlToString(deploymentConfiguration.getName(), profile, kayentaConfig)).setRequiredFiles(files);
     }
   }
 
@@ -78,6 +86,7 @@ public class KayentaProfileFactory extends SpringProfileFactory {
       DatadogConfig datadog;
       AwsConfig aws;
       S3Config s3;
+      SignalFxConfig signalfx;
 
       KayentaConfig(Canary canary) {
         for (AbstractCanaryServiceIntegration svc : canary.getServiceIntegrations()) {
@@ -96,6 +105,9 @@ public class KayentaProfileFactory extends SpringProfileFactory {
             AwsCanaryServiceIntegration awsSvc = (AwsCanaryServiceIntegration)svc;
             aws = new AwsConfig(awsSvc);
             s3 = new S3Config(awsSvc);
+          } else if (svc instanceof SignalfxCanaryServiceIntegration) {
+            SignalfxCanaryServiceIntegration signalfxSvc = (SignalfxCanaryServiceIntegration)svc;
+            signalfx = new SignalFxConfig(signalfxSvc);
           }
         }
       }
@@ -172,6 +184,17 @@ public class KayentaProfileFactory extends SpringProfileFactory {
 
         S3Config(AwsCanaryServiceIntegration awsSvc) {
           enabled = awsSvc.isS3Enabled();
+        }
+      }
+
+      @Data
+      static class SignalFxConfig {
+        private boolean enabled;
+        List<SignalfxCanaryAccount> accounts;
+
+        SignalFxConfig(SignalfxCanaryServiceIntegration signalfxSvc) {
+          enabled = signalfxSvc.isEnabled();
+          accounts = signalfxSvc.getAccounts();
         }
       }
     }

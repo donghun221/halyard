@@ -28,8 +28,8 @@ import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.SpinnakerRuntimeSetting
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service.SpinnakerService;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service.SpinnakerServiceProvider;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service.distributed.kubernetes.KubernetesSharedServiceSettings;
-import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Field;
@@ -39,13 +39,34 @@ import java.util.stream.Collectors;
 @Component
 public class KubectlServiceProvider extends SpinnakerServiceProvider<AccountDeploymentDetails<KubernetesAccount>> {
   @Autowired
+  @Qualifier("kubernetesV2ClouddriverService")
   KubernetesV2ClouddriverService clouddriverService;
+
+  @Autowired
+  KubernetesV2ClouddriverCachingService clouddriverCachingService;
+
+  @Autowired
+  @Qualifier("kubernetesV2ClouddriverRoService")
+  KubernetesV2ClouddriverRoService clouddriverRoService;
+
+  @Autowired
+  KubernetesV2ClouddriverRoDeckService clouddriverRoDeckService;
+
+  @Autowired
+  KubernetesV2ClouddriverRwService clouddriverRwService;
 
   @Autowired
   KubernetesV2DeckService deckService;
 
   @Autowired
+  @Qualifier("kubernetesV2EchoService")
   KubernetesV2EchoService echoService;
+
+  @Autowired
+  KubernetesV2EchoSchedulerService echoSchedulerService;
+
+  @Autowired
+  KubernetesV2EchoWorkerService echoWorkerService;
 
   @Autowired
   KubernetesV2FiatService fiatService;
@@ -74,23 +95,23 @@ public class KubectlServiceProvider extends SpinnakerServiceProvider<AccountDepl
   @Autowired
   KubernetesV2RoscoService roscoService;
 
+  @Autowired
+  KubernetesV2Utils kubernetesV2Utils;
+
   @Override
   public RemoteAction clean(AccountDeploymentDetails<KubernetesAccount> details, SpinnakerRuntimeSettings runtimeSettings) {
     DaemonTaskHandler.newStage("Invoking kubectl");
     DaemonTaskHandler.message("Deleting all 'svc,deploy,secret' resources with label 'app=spin'...");
     KubernetesSharedServiceSettings kubernetesSharedServiceSettings = new KubernetesSharedServiceSettings(details.getDeploymentConfiguration());
-    KubernetesV2Utils.deleteSpinnaker(details.getAccount(), kubernetesSharedServiceSettings.getDeployLocation());
+    new KubernetesV2Executor(DaemonTaskHandler.getJobExecutor(), details.getAccount(), kubernetesV2Utils).deleteSpinnaker(kubernetesSharedServiceSettings.getDeployLocation());
     return new RemoteAction();
   }
 
   public List<KubernetesV2Service> getServicesByPriority(List<SpinnakerService.Type> serviceTypes) {
     List<KubernetesV2Service> result = getFieldsOfType(KubernetesV2Service.class).stream()
         .filter(d -> serviceTypes.contains(d.getService().getType()))
+        .sorted((d1, d2) -> d2.getDeployPriority().compareTo(d1.getDeployPriority()))
         .collect(Collectors.toList());
-
-    if (result.removeIf(s -> s.getService().getType() == SpinnakerService.Type.REDIS)) {
-      result.add(0, redisService);
-    }
 
     return result;
   }

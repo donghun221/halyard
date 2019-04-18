@@ -16,7 +16,7 @@
 
 package com.netflix.spinnaker.halyard.config.model.v1.node;
 
-import com.netflix.spinnaker.halyard.config.problem.v1.ConfigProblemSetBuilder;
+import com.netflix.spinnaker.fiat.model.resources.Permissions;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -24,11 +24,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 public abstract class Master extends Node implements Cloneable {
   String name;
-
-  @Override
-  public void accept(ConfigProblemSetBuilder psBuilder, Validator v) {
-    v.validate(psBuilder, this);
-  }
+  Permissions.Builder permissions = new Permissions.Builder();
 
   @Override
   public String getNodeName() {

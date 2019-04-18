@@ -25,5 +25,6 @@ public class OracleCommand extends AbstractNamedProviderCommand {
   public OracleCommand() {
     super();
     registerSubcommand(new OracleAccountCommand());
+    registerSubcommand(new OracleBakeryCommand());
   }
 }

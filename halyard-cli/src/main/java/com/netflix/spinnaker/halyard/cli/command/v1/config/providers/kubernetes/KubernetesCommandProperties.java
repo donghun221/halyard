@@ -44,4 +44,13 @@ public class KubernetesCommandProperties {
 
   static final String CONFIGURE_IMAGE_PULL_SECRETS_DESCRIPTION = "(Only applicable to the v1 provider). When true, Spinnaker will create & manage your image pull "
       + "secrets for you; when false, you will have to create and attach them to your pod specs by hand.";
+
+  static final String ONLY_SPINNAKER_MANAGED_DESCRIPTION = "(V2 Only) When true, Spinnaker will only cache/display applications that have been\n"
+      + "created by Spinnaker; as opposed to attempting to configure applications for resources already present in Kubernetes.";
+
+  static final String CHECK_PERMISSIONS_ON_STARTUP = "When false, clouddriver will skip the permission checks for all kubernetes kinds at startup. This can save a great deal of time\n"
+      + "during clouddriver startup when you have many kubernetes accounts configured. This disables the log messages at startup about missing permissions.";
+
+  static final String LIVE_MANIFEST_CALLS = "When true, clouddriver will query manifest status during pipeline executions using live data rather than the cache.\n"
+      + "This eliminates all time spent in the \"force cache refresh\" task in pipelines, greatly reducing execution time.";
 }

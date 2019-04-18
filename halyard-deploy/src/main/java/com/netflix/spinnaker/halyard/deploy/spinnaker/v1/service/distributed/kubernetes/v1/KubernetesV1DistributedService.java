@@ -75,8 +75,8 @@ import io.fabric8.kubernetes.api.model.ServiceBuilder;
 import io.fabric8.kubernetes.api.model.ServicePortBuilder;
 import io.fabric8.kubernetes.api.model.Volume;
 import io.fabric8.kubernetes.api.model.VolumeBuilder;
-import io.fabric8.kubernetes.api.model.extensions.ReplicaSet;
-import io.fabric8.kubernetes.api.model.extensions.ReplicaSetBuilder;
+import io.fabric8.kubernetes.api.model.apps.ReplicaSet;
+import io.fabric8.kubernetes.api.model.apps.ReplicaSetBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.utils.Strings;
 import org.apache.commons.lang3.StringUtils;
@@ -127,7 +127,11 @@ public interface KubernetesV1DistributedService<T> extends DistributedService<T,
     String version = getArtifactService().getArtifactVersion(deploymentName, getArtifact());
     version = Versions.isLocal(version) ? Versions.fromLocal(version) : version;
 
-    KubernetesImageDescription image = new KubernetesImageDescription(artifactName, version, getDockerRegistry(deploymentName, getArtifact()));
+    KubernetesImageDescription image = KubernetesImageDescription.builder()
+        .registry(getDockerRegistry(deploymentName, getArtifact()))
+        .repository(artifactName)
+        .tag(version)
+        .build();
     return KubernetesUtil.getImageId(image);
   }
 
@@ -331,7 +335,6 @@ public interface KubernetesV1DistributedService<T> extends DistributedService<T,
     DeploymentEnvironment deploymentEnvironment = details
         .getDeploymentConfiguration()
         .getDeploymentEnvironment();
-
     String accountName = details.getAccount().getName();
     String namespace = getNamespace(settings);
     String name = getServiceName();
@@ -357,6 +360,7 @@ public interface KubernetesV1DistributedService<T> extends DistributedService<T,
 
     description.setVolumeSources(volumeSources);
     description.setPodAnnotations(settings.getKubernetes().getPodAnnotations());
+    description.setNodeSelector(deploymentEnvironment.getNodeSelectors());
 
     List<String> loadBalancers = new ArrayList<>();
     loadBalancers.add(name);

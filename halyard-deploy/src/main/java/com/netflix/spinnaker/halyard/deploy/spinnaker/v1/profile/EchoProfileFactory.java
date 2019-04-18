@@ -16,11 +16,13 @@
 
 package com.netflix.spinnaker.halyard.deploy.spinnaker.v1.profile;
 
+import com.netflix.spinnaker.halyard.config.model.v1.node.Artifacts;
 import com.netflix.spinnaker.halyard.config.model.v1.node.DeploymentConfiguration;
 import com.netflix.spinnaker.halyard.config.model.v1.node.Notifications;
 import com.netflix.spinnaker.halyard.config.model.v1.node.Pubsubs;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.SpinnakerArtifact;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.SpinnakerRuntimeSettings;
+import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service.SpinnakerService.Type;
 import lombok.Data;
 import org.springframework.stereotype.Component;
 
@@ -35,24 +37,35 @@ public class EchoProfileFactory extends SpringProfileFactory {
   }
 
   @Override
+  public String getMinimumSecretDecryptionVersion(String deploymentName) {
+    return "2.3.2";
+  }
+
+  @Override
   protected void setProfile(Profile profile, DeploymentConfiguration deploymentConfiguration, SpinnakerRuntimeSettings endpoints) {
     super.setProfile(profile, deploymentConfiguration, endpoints);
 
     List<String> files = new ArrayList<>();
 
     profile.appendContents("global.spinnaker.timezone: " + deploymentConfiguration.getTimezone());
-    profile.appendContents("spinnaker.baseUrl: " + endpoints.getServices().getDeck().getBaseUrl());
+    profile.appendContents("spinnaker.baseUrl: " + endpoints.getServiceSettings(Type.DECK).getBaseUrl());
 
     Notifications notifications = deploymentConfiguration.getNotifications();
     if (notifications != null) {
       files.addAll(backupRequiredFiles(notifications, deploymentConfiguration.getName()));
-      profile.appendContents(yamlToString(notifications));
+      profile.appendContents(yamlToString(deploymentConfiguration.getName(), profile, notifications));
     }
 
     Pubsubs pubsubs = deploymentConfiguration.getPubsub();
     if (pubsubs != null) {
       files.addAll(backupRequiredFiles(pubsubs, deploymentConfiguration.getName()));
-      profile.appendContents(yamlToString(new PubsubWrapper(pubsubs)));
+      profile.appendContents(yamlToString(deploymentConfiguration.getName(), profile, new PubsubWrapper(pubsubs)));
+    }
+
+    Artifacts artifacts = deploymentConfiguration.getArtifacts();
+    if (artifacts != null) {
+      files.addAll(backupRequiredFiles(artifacts, deploymentConfiguration.getName()));
+      profile.appendContents(yamlToString(deploymentConfiguration.getName(), profile, new ArtifactWrapper(artifacts)));
     }
 
     profile.appendContents(profile.getBaseContents())
@@ -65,6 +78,15 @@ public class EchoProfileFactory extends SpringProfileFactory {
 
     PubsubWrapper(Pubsubs pubsub) {
       this.pubsub = pubsub;
+    }
+  }
+
+  @Data
+  private static class ArtifactWrapper {
+    private Artifacts artifacts;
+
+    ArtifactWrapper(Artifacts artifacts) {
+      this.artifacts = artifacts;
     }
   }
 }

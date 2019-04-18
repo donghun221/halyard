@@ -22,9 +22,13 @@ import com.netflix.spinnaker.halyard.config.model.v1.node.DeploymentConfiguratio
 import com.netflix.spinnaker.halyard.config.model.v1.node.Features;
 import com.netflix.spinnaker.halyard.config.model.v1.node.Notifications;
 import com.netflix.spinnaker.halyard.config.model.v1.notifications.SlackNotification;
+import com.netflix.spinnaker.halyard.config.model.v1.notifications.TwilioNotification;
 import com.netflix.spinnaker.halyard.config.model.v1.providers.appengine.AppengineProvider;
 import com.netflix.spinnaker.halyard.config.model.v1.providers.azure.AzureProvider;
+import com.netflix.spinnaker.halyard.config.model.v1.providers.cloudfoundry.CloudFoundryProvider;
 import com.netflix.spinnaker.halyard.config.model.v1.providers.dcos.DCOSProvider;
+import com.netflix.spinnaker.halyard.config.model.v1.providers.aws.AwsAccount;
+import com.netflix.spinnaker.halyard.config.model.v1.providers.aws.AwsProvider;
 import com.netflix.spinnaker.halyard.config.model.v1.providers.ecs.EcsProvider;
 import com.netflix.spinnaker.halyard.config.model.v1.providers.google.GoogleProvider;
 import com.netflix.spinnaker.halyard.config.model.v1.providers.kubernetes.KubernetesProvider;
@@ -39,11 +43,13 @@ import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.SpinnakerArtifact;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.SpinnakerRuntimeSettings;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.profile.Profile;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.profile.RegistryBackedProfileFactory;
+import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service.SpinnakerService.Type;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -77,7 +83,7 @@ public class DeckProfileFactory extends RegistryBackedProfileFactory {
     String version = deploymentConfiguration.getVersion();
 
     // Configure global settings
-    bindings.put("gate.baseUrl", endpoints.getServices().getGate().getBaseUrl());
+    bindings.put("gate.baseUrl", endpoints.getServiceSettings(Type.GATE).getBaseUrl());
     bindings.put("timezone", deploymentConfiguration.getTimezone());
     bindings.put("version", deploymentConfiguration.getVersion());
 
@@ -109,6 +115,9 @@ public class DeckProfileFactory extends RegistryBackedProfileFactory {
     bindings.put("features.appengineContainerImageUrlDeployments", Boolean.toString(features.getAppengineContainerImageUrlDeployments() != null ? features.getAppengineContainerImageUrlDeployments() : false));
     bindings.put("features.travis", Boolean.toString(features.getTravis() != null ? features.getTravis() : false));
     bindings.put("features.wercker", Boolean.toString(features.getWercker() != null ? features.getWercker() : false));
+    bindings.put("features.managedPipelineTemplatesV2UI", Boolean.toString(features.getManagedPipelineTemplatesV2UI() != null ? features.getManagedPipelineTemplatesV2UI() : false));
+    bindings.put("features.gremlin", Boolean.toString(features.getGremlin() != null ? features.getGremlin() : false));
+    bindings.put("features.infrastructureStages", Boolean.toString(features.getInfrastructureStages() != null ? features.getInfrastructureStages() : false));
 
     // Configure Kubernetes
     KubernetesProvider kubernetesProvider = deploymentConfiguration.getProviders().getKubernetes();
@@ -146,9 +155,24 @@ public class DeckProfileFactory extends RegistryBackedProfileFactory {
       bindings.put("openstack.default.region", firstRegion);
     }
 
+    // Configure AWS
+    AwsProvider awsProvider = deploymentConfiguration.getProviders().getAws();
+    bindings.put("aws.default.account", awsProvider.getPrimaryAccount());
+    if (awsProvider.getPrimaryAccount() != null) {
+      AwsAccount awsAccount = (AwsAccount) accountService.getProviderAccount(deploymentConfiguration.getName(), "aws", awsProvider.getPrimaryAccount());
+      List<AwsProvider.AwsRegion> regionList = awsAccount.getRegions();
+      if (!regionList.isEmpty() && regionList.get(0) != null) {
+        bindings.put("aws.default.region", regionList.get(0).getName());
+      }
+    }
+
     // Configure ECS
     EcsProvider ecsProvider = deploymentConfiguration.getProviders().getEcs();
     bindings.put("ecs.default.account", ecsProvider.getPrimaryAccount());
+
+    // Configure CloudFoundry
+    CloudFoundryProvider cloudFoundryProvider = deploymentConfiguration.getProviders().getCloudfoundry();
+    bindings.put("cloudfoundry.default.account", cloudFoundryProvider.getPrimaryAccount());
 
     // Configure notifications
     bindings.put("notifications.enabled", notifications.isEnabled() + "");
@@ -156,6 +180,9 @@ public class DeckProfileFactory extends RegistryBackedProfileFactory {
     SlackNotification slackNotification = notifications.getSlack();
     bindings.put("notifications.slack.enabled", slackNotification.isEnabled() + "");
     bindings.put("notifications.slack.botName", slackNotification.getBotName());
+
+    TwilioNotification twilioNotification = notifications.getTwilio();
+    bindings.put("notifications.twilio.enabled", twilioNotification.isEnabled() + "");
 
     // Configure canary
     Canary canary = deploymentConfiguration.getCanary();

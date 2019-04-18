@@ -51,10 +51,13 @@ abstract public class ArtifactProvider<A extends ArtifactAccount> extends Node {
   public enum ProviderType {
     BITBUCKET("bitbucket"),
     GCS("gcs"),
+    ORACLE("oracle"),
     GITHUB("github"),
     GITLAB("gitlab"),
+    HELM("helm"),
     HTTP("http"),
-    S3("s3");
+    S3("s3"),
+    MAVEN("maven");
 
     @Getter
     final private String name;

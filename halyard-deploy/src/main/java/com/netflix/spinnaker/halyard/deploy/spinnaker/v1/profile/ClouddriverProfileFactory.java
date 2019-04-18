@@ -53,6 +53,11 @@ public class ClouddriverProfileFactory extends SpringProfileFactory {
   }
 
   @Override
+  public String getMinimumSecretDecryptionVersion(String deploymentName) {
+    return "4.3.6";
+  }
+
+  @Override
   protected void setProfile(Profile profile, DeploymentConfiguration deploymentConfiguration, SpinnakerRuntimeSettings endpoints) {
     super.setProfile(profile, deploymentConfiguration, endpoints);
 
@@ -77,12 +82,13 @@ public class ClouddriverProfileFactory extends SpringProfileFactory {
       processProviders(deploymentConfiguration.getProviders());
     }
 
-    profile.appendContents(yamlToString(modifiedProviders))
-        .appendContents(yamlToString(new ArtifactWrapper(artifacts)))
+    profile.appendContents(yamlToString(deploymentConfiguration.getName(), profile, modifiedProviders))
+        .appendContents(yamlToString(deploymentConfiguration.getName(), profile, new ArtifactWrapper(artifacts)))
         .appendContents(profile.getBaseContents())
         .setRequiredFiles(files);
 
     deploymentConfiguration.setProviders(originalProviders);
+    deploymentConfiguration.parentify();
   }
 
   protected void processProviders(Providers providers) {

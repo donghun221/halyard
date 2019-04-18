@@ -19,9 +19,6 @@ package com.netflix.spinnaker.halyard.cli.command.v1.config.providers.account;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
-import com.netflix.spinnaker.fiat.model.Authorization;
-import com.netflix.spinnaker.fiat.model.resources.Permissions;
-import com.netflix.spinnaker.fiat.model.resources.Permissions.Builder;
 import com.netflix.spinnaker.halyard.cli.command.v1.NestableCommand;
 import com.netflix.spinnaker.halyard.cli.services.v1.Daemon;
 import com.netflix.spinnaker.halyard.cli.services.v1.OperationHandler;
@@ -109,9 +106,16 @@ public abstract class AbstractEditAccountCommand<T extends Account> extends Abst
   )
   private Provider.ProviderVersion providerVersion;
 
+  @Parameter(
+        names = "--environment",
+        arity = 1,
+        description = AccountCommandProperties.ENVIRONMENT_DESCRIPTION
+  )
+  private String environment;
+
   protected abstract Account editAccount(T account);
 
-  public String getDescription() {
+  public String getShortDescription() {
     return "Edit an account in the " + getProviderName() + " provider.";
   }
 
@@ -145,18 +149,12 @@ public abstract class AbstractEditAccountCommand<T extends Account> extends Abst
     account.setRequiredGroupMembership(
         updateStringList(account.getRequiredGroupMembership(), requiredGroupMembership, addRequiredGroupMembership, removeRequiredGroupMembership));
 
-    Permissions.Builder permissions = account.getPermissions();
-
-    List<String> resolvedReadPermissions = updateStringList(
-        permissions.get(Authorization.READ), readPermissions, addReadPermission, removeReadPermission);
-    List<String> resolvedWritePermissions = updateStringList(
-        permissions.get(Authorization.WRITE), writePermissions, addWritePermission, removeWritePermission);
-
-    permissions.clear();
-    permissions.add(Authorization.READ, resolvedReadPermissions);
-    permissions.add(Authorization.WRITE, resolvedWritePermissions);
+    updatePermissions(account.getPermissions(), readPermissions, addReadPermission, removeReadPermission,
+        writePermissions, addWritePermission, removeWritePermission);
 
     account.setProviderVersion(isSet(providerVersion) ? providerVersion : account.getProviderVersion());
+
+    account.setEnvironment(isSet(environment) ? environment : account.getEnvironment());
 
     if (originaHash == account.hashCode()) {
       AnsiUi.failure("No changes supplied.");

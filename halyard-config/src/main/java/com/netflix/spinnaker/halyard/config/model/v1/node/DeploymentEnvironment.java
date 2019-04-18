@@ -17,12 +17,14 @@
 package com.netflix.spinnaker.halyard.config.model.v1.node;
 
 import com.netflix.spinnaker.halyard.config.model.v1.ha.HaServices;
-import com.netflix.spinnaker.halyard.config.problem.v1.ConfigProblemSetBuilder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * A DeploymentEnvironment is a location where Spinnaker is installed.
@@ -30,18 +32,11 @@ import java.util.Arrays;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class DeploymentEnvironment extends Node {
-  @Override
-  public void accept(ConfigProblemSetBuilder psBuilder, Validator v) {
-    v.validate(psBuilder, this);
-  }
 
   @Override
   public String getNodeName() {
     return "deploymentEnvironment";
   }
-
-  @Override
-  public NodeIterator getChildren() { return NodeIteratorFactory.makeReflectiveIterator(this); }
 
   public enum DeploymentType {
     Distributed("Deploy Spinnaker with one server group and load balancer "
@@ -99,7 +94,13 @@ public class DeploymentEnvironment extends Node {
   private Vault vault = new Vault();
   private String location;
   private CustomSizing customSizing = new CustomSizing();
+  private Map<String, List<SidecarConfig>> sidecars = new HashMap<>();
+  private Map<String, List<Map>> initContainers = new HashMap<>();
+  private Map<String, List<Map>> hostAliases = new HashMap<>();
+  private Map<String, AffinityConfig> affinity = new HashMap<>();
+  private Map<String, String> nodeSelectors = new HashMap<>();
   private GitConfig gitConfig = new GitConfig();
+  @ValidForSpinnakerVersion(lowerBound = "1.10.0", tooLowMessage = "High availability services are not available prior to this release.")
   private HaServices haServices = new HaServices();
 
   public Boolean getUpdateVersions() {

@@ -17,7 +17,9 @@
 
 package com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.CaseFormat;
 import com.netflix.spinnaker.halyard.config.config.v1.HalconfigDirectoryStructure;
 import com.netflix.spinnaker.halyard.config.model.v1.node.DeploymentConfiguration;
 import com.netflix.spinnaker.halyard.core.error.v1.HalException;
@@ -73,8 +75,16 @@ abstract public class SpinnakerService<T> implements HasServiceSettings<T> {
     return getType().getCanonicalName();
   }
 
+  public String getBaseCanonicalName() {
+    return getType().getBaseType().getCanonicalName();
+  }
+
   public String getSpinnakerStagingPath(String deploymentName) {
     return halconfigDirectoryStructure.getStagingPath(deploymentName).toString();
+  }
+
+  public String getSpinnakerStagingDependenciesPath(String deploymentName) {
+    return halconfigDirectoryStructure.getStagingDependenciesPath(deploymentName).toString();
   }
 
   public ServiceSettings getDefaultServiceSettings(DeploymentConfiguration deploymentConfiguration) {
@@ -132,40 +142,68 @@ abstract public class SpinnakerService<T> implements HasServiceSettings<T> {
     });
   }
 
-  public enum Type {
-    CLOUDDRIVER("spin-clouddriver", "clouddriver"),
-    CLOUDDRIVER_BOOTSTRAP("spin-clouddriver-bootstrap", "clouddriver-bootstrap"),
-    CONSUL_CLIENT("spin-consul-client", "consul-client"),
-    CONSUL_SERVER("spin-consul-server", "consul-server"),
-    DECK("spin-deck", "deck"),
-    ECHO("spin-echo", "echo"),
-    FIAT("spin-fiat", "fiat"),
-    FRONT50("spin-front50", "front50"),
-    GATE("spin-gate", "gate"),
-    IGOR("spin-igor", "igor"),
-    KAYENTA("spin-kayenta", "kayenta"),
-    ORCA("spin-orca", "orca"),
-    ORCA_BOOTSTRAP("spin-orca-bootstrap", "orca-bootstrap"),
-    REDIS("spin-redis", "redis"),
-    REDIS_BOOTSTRAP("spin-redis-bootstrap", "redis-bootstrap"),
-    ROSCO("spin-rosco", "rosco"),
-    MONITORING_DAEMON("spin-monitoring-daemon", "monitoring-daemon"),
-    VAULT_CLIENT("spin-vault-client", "vault-client"),
-    VAULT_SERVER("spin-vault-server", "vault-server");
+  public boolean hasTypeModifier() {
+    return getType().getModifier() != null;
+  }
 
+  public String getTypeModifier() {
+    return getType().getModifier();
+  }
+
+  public enum Type {
+    CLOUDDRIVER("clouddriver"),
+    CLOUDDRIVER_BOOTSTRAP(CLOUDDRIVER, "bootstrap"),
+    CLOUDDRIVER_CACHING(CLOUDDRIVER, "caching"),
+    CLOUDDRIVER_RO(CLOUDDRIVER, "ro"),
+    CLOUDDRIVER_RO_DECK(CLOUDDRIVER, "ro-deck"),
+    CLOUDDRIVER_RW(CLOUDDRIVER, "rw"),
+    CONSUL_CLIENT("consul-client"),
+    CONSUL_SERVER("consul-server"),
+    DECK("deck"),
+    ECHO("echo"),
+    ECHO_SCHEDULER(ECHO, "scheduler"),
+    ECHO_WORKER(ECHO, "worker"),
+    FIAT("fiat"),
+    FRONT50("front50"),
+    GATE("gate"),
+    IGOR("igor"),
+    KAYENTA("kayenta"),
+    ORCA("orca"),
+    ORCA_BOOTSTRAP(ORCA, "bootstrap"),
+    REDIS("redis"),
+    REDIS_BOOTSTRAP(REDIS, "bootstrap"),
+    ROSCO("rosco"),
+    MONITORING_DAEMON("monitoring-daemon"),
+    VAULT_CLIENT("vault-client"),
+    VAULT_SERVER("vault-server");
+
+    @Getter
+    final String canonicalName;
     @Getter
     final String serviceName;
     @Getter
-    final String canonicalName;
+    final String modifier;
+    @Getter
+    final Type baseType;
 
-    Type(String serviceName, String canonicalName) {
-      this.serviceName = serviceName;
+    Type(String canonicalName) {
       this.canonicalName = canonicalName;
+      this.serviceName = "spin-" + canonicalName;
+      this.modifier = null;
+      this.baseType = this;
     }
 
-    @Override
-    public String toString() {
-      return serviceName;
+    Type(Type baseType, String modifier) {
+      this.canonicalName = baseType.getCanonicalName() + "-" + modifier;
+      this.serviceName = "spin-" + this.canonicalName;
+      this.baseType = baseType;
+      this.modifier = modifier;
+    }
+
+    @JsonValue
+    public String asYamlKey() {
+      // When SpinnakerRuntimeSettings is serialized, we expect its keys to be camel-cased.
+      return CaseFormat.LOWER_HYPHEN.to(CaseFormat.LOWER_CAMEL, canonicalName);
     }
 
     private static String reduceName(String name) {

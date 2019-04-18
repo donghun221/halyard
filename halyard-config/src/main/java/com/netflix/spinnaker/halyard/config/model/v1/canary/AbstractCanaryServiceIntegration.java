@@ -22,11 +22,10 @@ import com.netflix.spinnaker.halyard.config.model.v1.canary.aws.AwsCanaryService
 import com.netflix.spinnaker.halyard.config.model.v1.canary.datadog.DatadogCanaryServiceIntegration;
 import com.netflix.spinnaker.halyard.config.model.v1.canary.google.GoogleCanaryServiceIntegration;
 import com.netflix.spinnaker.halyard.config.model.v1.canary.prometheus.PrometheusCanaryServiceIntegration;
+import com.netflix.spinnaker.halyard.config.model.v1.canary.signalfx.SignalfxCanaryServiceIntegration;
 import com.netflix.spinnaker.halyard.config.model.v1.node.Node;
 import com.netflix.spinnaker.halyard.config.model.v1.node.NodeIterator;
 import com.netflix.spinnaker.halyard.config.model.v1.node.NodeIteratorFactory;
-import com.netflix.spinnaker.halyard.config.model.v1.node.Validator;
-import com.netflix.spinnaker.halyard.config.problem.v1.ConfigProblemSetBuilder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -38,6 +37,7 @@ import java.util.stream.Collectors;
 @JsonSubTypes({@JsonSubTypes.Type(value = GoogleCanaryServiceIntegration.class, name = GoogleCanaryServiceIntegration.NAME),
                @JsonSubTypes.Type(value = PrometheusCanaryServiceIntegration.class, name = PrometheusCanaryServiceIntegration.NAME),
                @JsonSubTypes.Type(value = DatadogCanaryServiceIntegration.class, name = DatadogCanaryServiceIntegration.NAME),
+               @JsonSubTypes.Type(value = SignalfxCanaryServiceIntegration.class, name = SignalfxCanaryServiceIntegration.NAME),
                @JsonSubTypes.Type(value = AwsCanaryServiceIntegration.class, name = AwsCanaryServiceIntegration.NAME)})
 @Data
 @EqualsAndHashCode(callSuper = false)
@@ -46,11 +46,6 @@ public abstract class AbstractCanaryServiceIntegration<A extends AbstractCanaryA
   List<A> accounts = new ArrayList<>();
 
   public abstract String getName();
-
-  @Override
-  public void accept(ConfigProblemSetBuilder psBuilder, Validator v) {
-    v.validate(psBuilder, this);
-  }
 
   @Override
   public String getNodeName() {

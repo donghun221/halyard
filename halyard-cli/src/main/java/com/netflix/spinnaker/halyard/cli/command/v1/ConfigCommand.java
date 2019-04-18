@@ -24,6 +24,7 @@ import com.netflix.spinnaker.halyard.cli.command.v1.config.canary.CanaryCommand;
 import com.netflix.spinnaker.halyard.cli.command.v1.config.ci.CiCommand;
 import com.netflix.spinnaker.halyard.cli.command.v1.config.providers.ProviderCommand;
 import com.netflix.spinnaker.halyard.cli.command.v1.config.pubsubs.PubsubCommand;
+import com.netflix.spinnaker.halyard.cli.command.v1.config.webhook.WebhookCommand;
 import com.netflix.spinnaker.halyard.cli.services.v1.Daemon;
 import com.netflix.spinnaker.halyard.cli.services.v1.OperationHandler;
 import com.netflix.spinnaker.halyard.cli.ui.v1.AnsiFormatUtils;
@@ -42,7 +43,7 @@ public class ConfigCommand extends AbstractConfigCommand {
   private String commandName = "config";
 
   @Getter(AccessLevel.PUBLIC)
-  private String description = "Configure, validate, and view your halconfig.";
+  private String shortDescription = "Configure, validate, and view your halconfig.";
 
   @Parameter(
       names = "--set-current-deployment",
@@ -64,7 +65,9 @@ public class ConfigCommand extends AbstractConfigCommand {
     registerSubcommand(new PubsubCommand());
     registerSubcommand(new SecurityCommand());
     registerSubcommand(new VersionConfigCommand());
+    registerSubcommand(new WebhookCommand());
     registerSubcommand(new CiCommand());
+    registerSubcommand(new ListCommand());
   }
 
   @Override

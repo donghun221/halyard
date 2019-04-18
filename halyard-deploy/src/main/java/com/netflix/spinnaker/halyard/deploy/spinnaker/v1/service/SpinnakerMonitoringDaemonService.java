@@ -41,6 +41,7 @@ import java.util.*;
 abstract public class SpinnakerMonitoringDaemonService extends SpinnakerService<SpinnakerMonitoringDaemonService.SpinnakerMonitoringDaemon> implements SidecarService {
   protected final String CONFIG_OUTPUT_PATH = "/opt/spinnaker-monitoring/config/";
   protected final String REGISTRY_OUTPUT_PATH = "/opt/spinnaker-monitoring/registry/";
+  protected final String FILTERS_OUTPUT_PATH = "/opt/spinnaker-monitoring/filters/";
 
   @Autowired
   SpinnakerMonitoringDaemonProfileFactory spinnakerMonitoringDaemonProfileFactory;
@@ -74,6 +75,14 @@ abstract public class SpinnakerMonitoringDaemonService extends SpinnakerService<
     return "spinnaker-monitoring.yml";
   }
 
+  private static String monitoringLocalProfileName() {
+    return "spinnaker-monitoring-local.yml";
+  }
+
+  private static String defaultFilterProfileName() {
+    return "monitoring-daemon/filters/default.yml";
+  }
+
   @Override
   public List<Profile> getProfiles(DeploymentConfiguration deploymentConfiguration, SpinnakerRuntimeSettings endpoints) {
     List<Profile> results = new ArrayList<>();
@@ -92,6 +101,7 @@ abstract public class SpinnakerMonitoringDaemonService extends SpinnakerService<
     String profilePath = Paths.get(CONFIG_OUTPUT_PATH, profileName).toString();
 
     results.add(spinnakerMonitoringDaemonProfileFactory.getProfile(profileName, profilePath, deploymentConfiguration, endpoints));
+
     return results;
   }
 
@@ -106,6 +116,17 @@ abstract public class SpinnakerMonitoringDaemonService extends SpinnakerService<
 
     profile = monitoringProfiles.get(monitoringProfileName());
     result.add(profile);
+
+    profile = monitoringProfiles.get(monitoringLocalProfileName());
+    if (profile != null) {
+      result.add(profile);
+    }
+
+    profile = monitoringProfiles.get(defaultFilterProfileName());
+    if (profile != null) {
+      result.add(profile);
+    }
+
     return result;
   }
 
@@ -130,6 +151,12 @@ abstract public class SpinnakerMonitoringDaemonService extends SpinnakerService<
 
   @Override
   protected Optional<String> customProfileOutputPath(String profileName) {
+    if (defaultFilterProfileName().equalsIgnoreCase(profileName)) {
+      return Optional.of(Paths.get(FILTERS_OUTPUT_PATH, "default.yml").toString());
+    }
+    if (monitoringLocalProfileName().equalsIgnoreCase(profileName)) {
+      return Optional.of(Paths.get(CONFIG_OUTPUT_PATH, profileName).toString());
+    }
     return Optional.empty();
   }
 }

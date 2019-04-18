@@ -17,9 +17,9 @@
 
 package com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service.local.git;
 
+import com.netflix.spinnaker.halyard.config.config.v1.HalconfigDirectoryStructure;
 import com.netflix.spinnaker.halyard.config.model.v1.node.DeploymentConfiguration;
 import com.netflix.spinnaker.halyard.config.model.v1.security.Security;
-import com.netflix.spinnaker.halyard.config.model.v1.security.UiSecurity;
 import com.netflix.spinnaker.halyard.core.RemoteAction;
 import com.netflix.spinnaker.halyard.core.resource.v1.StringReplaceJarResource;
 import com.netflix.spinnaker.halyard.core.resource.v1.TemplatedResource;
@@ -29,8 +29,11 @@ import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.SpinnakerRuntimeSetting
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.profile.Profile;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service.DeckService;
 import com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service.ServiceSettings;
+import java.nio.file.Path;
+import java.util.Optional;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -44,8 +47,14 @@ import java.util.Map;
 @Data
 @Component
 public class LocalGitDeckService extends DeckService implements LocalGitService<DeckService.Deck> {
-  String deskSettingsPath = "settings.js";
-  String deckPath = "~/.spinnaker/" + deskSettingsPath;
+
+  @Autowired
+  private HalconfigDirectoryStructure halconfigDirectoryStructure;
+
+  String deckSettingsPath = "settings.js";
+  String deckSettingsLocalPath = "settings-local.js";
+  String homeDotSpinnakerPath = "~/.spinnaker/";
+  String deckPath = Paths.get(homeDotSpinnakerPath, deckSettingsPath).toString();
 
   String startCommand = String
       .join("\n", "export SETTINGS_PATH=" + deckPath, "yarn > /dev/null", "yarn start");
@@ -61,9 +70,13 @@ public class LocalGitDeckService extends DeckService implements LocalGitService<
     Security security = deploymentConfiguration.getSecurity();
     if (security.getUiSecurity().getSsl().isEnabled()) {
       setEnvTrue("DECK_HTTPS");
+      setEnv("DECK_CERT", security.getUiSecurity().getSsl().getSslCertificateFile());
+      setEnv("DECK_KEY", security.getUiSecurity().getSsl().getSslCertificateKeyFile());
+      setEnv("DECK_CA_CERT", security.getUiSecurity().getSsl().getSslCACertificateFile());
     }
     if (security.getAuthn().isEnabled()) {
       setEnvTrue("AUTH_ENABLED");
+      setEnv("DECK_HOST", "0.0.0.0");
     }
     if (security.getAuthz().isEnabled()) {
       setEnvTrue("FIAT_ENABLED");
@@ -78,6 +91,12 @@ public class LocalGitDeckService extends DeckService implements LocalGitService<
     setStartCommand(String.join("\n", "export " + var + "=true", getStartCommand()));
   }
 
+  private void setEnv(String var, String value) {
+    if (StringUtils.isNotEmpty(value)) {
+      setStartCommand(String.join("\n", "export " + var + "=" + value, getStartCommand()));
+    }
+  }
+
   public String getArtifactId(String deploymentName) {
     return LocalGitService.super.getArtifactId(deploymentName);
   }
@@ -90,7 +109,18 @@ public class LocalGitDeckService extends DeckService implements LocalGitService<
   @Override
   public List<Profile> getProfiles(DeploymentConfiguration deploymentConfiguration, SpinnakerRuntimeSettings endpoints) {
     List<Profile> result = new ArrayList<>();
-    result.add(deckProfileFactory.getProfile(deskSettingsPath, deckPath, deploymentConfiguration, endpoints));
+    Profile deckProfile = deckProfileFactory.getProfile(deckSettingsPath, deckPath, deploymentConfiguration, endpoints);
+
+    String deploymentName = deploymentConfiguration.getName();
+    Path userProfilePath = halconfigDirectoryStructure.getUserProfilePath(deploymentName);
+    Optional<Profile> settingsLocalProfile = this.customProfile(
+        deploymentConfiguration,
+        endpoints,
+        Paths.get(userProfilePath.toString(), deckSettingsLocalPath),
+        deckSettingsLocalPath);
+    settingsLocalProfile.ifPresent(p -> deckProfile.appendContents(p.getContents()));
+
+    result.add(deckProfile);
     return result;
   }
 
@@ -116,5 +146,13 @@ public class LocalGitDeckService extends DeckService implements LocalGitService<
     new RemoteAction()
         .setScript(script)
         .commitScript(Paths.get(getScriptsDir(), getArtifact().getName() + "-stop.sh"));
+  }
+
+  protected Optional<String> customProfileOutputPath(String profileName) {
+    if (profileName.equals(deckSettingsLocalPath)) {
+      return Optional.of(homeDotSpinnakerPath + "settings-local-ignored.js");
+    } else {
+      return Optional.empty();
+    }
   }
 }

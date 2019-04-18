@@ -26,6 +26,11 @@ import java.util.Map;
 public class ConfigSource {
   String id;
   String mountPath;
+  Type type = Type.secret;
   Map<String, String> env = new HashMap<>();
+
+  public enum Type {
+    emptyDir, configMap, secret
+  }
 }
 

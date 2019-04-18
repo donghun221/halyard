@@ -16,11 +16,16 @@
 
 package com.netflix.spinnaker.halyard.config.config.v1;
 
+import java.util.concurrent.Executors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.representer.Representer;
 
 import java.io.File;
 import java.nio.file.Paths;
@@ -36,6 +41,11 @@ public class ResourceConfig {
   @Bean
   String halconfigDirectory(@Value("${halyard.halconfig.directory:~/.hal}") String path) {
     return normalizePath(path);
+  }
+
+  @Bean
+  TaskScheduler taskScheduler() {
+    return new ConcurrentTaskScheduler(Executors.newSingleThreadScheduledExecutor());
   }
 
   @Bean
@@ -81,7 +91,7 @@ public class ResourceConfig {
     DumperOptions options = new DumperOptions();
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
     options.setDefaultScalarStyle(DumperOptions.ScalarStyle.PLAIN);
-    return new Yaml(options);
+    return new Yaml(new SafeConstructor(), new Representer(), options);
   }
 
   private String normalizePath(String path) {

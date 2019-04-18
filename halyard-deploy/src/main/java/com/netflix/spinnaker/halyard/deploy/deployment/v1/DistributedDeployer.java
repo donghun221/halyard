@@ -175,7 +175,8 @@ public class DistributedDeployer<T extends Account> implements
   public RemoteAction deploy(DistributedServiceProvider<T> serviceProvider,
       AccountDeploymentDetails<T> deploymentDetails,
       ResolvedConfiguration resolvedConfiguration,
-      List<SpinnakerService.Type> serviceTypes) {
+      List<SpinnakerService.Type> serviceTypes,
+      boolean waitForCompletion) {
     SpinnakerRuntimeSettings runtimeSettings = resolvedConfiguration.getRuntimeSettings();
 
     DaemonTaskHandler.newStage("Deploying Spinnaker");
@@ -317,7 +318,13 @@ public class DistributedDeployer<T extends Account> implements
     } catch (RetrofitError e) {
       boolean enabled = roscoSettings.getEnabled() != null && roscoSettings.getEnabled();
       if (enabled) {
-        String message = ((Map<String, String>) e.getBodyAs(Map.class)).get("message");
+        Map<String, String> body = (Map<String, String>) e.getBodyAs(Map.class);
+        String message;
+        if (body != null) {
+          message = body.getOrDefault("message", "no message supplied");
+        } else {
+          message = "no response body";
+        }
         throw new HalException(Problem.Severity.FATAL,
             "Rosco is enabled, and no connection to rosco could be established: " + e + ": " + message, e);
       }

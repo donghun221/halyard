@@ -16,44 +16,79 @@
 
 package com.netflix.spinnaker.halyard.config.validate.v1.providers.dockerRegistry;
 
+import com.netflix.spinnaker.clouddriver.docker.registry.api.v2.client.DefaultDockerOkClientProvider;
 import com.netflix.spinnaker.clouddriver.docker.registry.api.v2.client.DockerRegistryCatalog;
 import com.netflix.spinnaker.clouddriver.docker.registry.security.DockerRegistryNamedAccountCredentials;
+import com.netflix.spinnaker.halyard.core.secrets.v1.SecretSessionManager;
 import com.netflix.spinnaker.halyard.config.model.v1.node.Validator;
 import com.netflix.spinnaker.halyard.config.model.v1.providers.dockerRegistry.DockerRegistryAccount;
 import com.netflix.spinnaker.halyard.config.problem.v1.ConfigProblemBuilder;
 import com.netflix.spinnaker.halyard.config.problem.v1.ConfigProblemSetBuilder;
-import com.netflix.spinnaker.halyard.config.validate.v1.util.ValidatingFileReader;
 import com.netflix.spinnaker.halyard.core.problem.v1.Problem.Severity;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+
 @Component
+@Slf4j
 public class DockerRegistryAccountValidator extends Validator<DockerRegistryAccount> {
+  @Autowired
+  private SecretSessionManager secretSessionManager;
+
   @Override
   public void validate(ConfigProblemSetBuilder p, DockerRegistryAccount n) {
     String resolvedPassword = null;
     String password = n.getPassword();
+    String passwordCommand = n.getPasswordCommand();
     String passwordFile = n.getPasswordFile();
     String username = n.getUsername();
 
     boolean passwordProvided = password != null && !password.isEmpty();
+    boolean passwordCommandProvided = passwordCommand != null && !passwordCommand.isEmpty();
     boolean passwordFileProvided = passwordFile != null && !passwordFile.isEmpty();
 
-    if (passwordProvided && passwordFileProvided) {
-      p.addProblem(Severity.ERROR, "You have provided both a password and a password file for your docker registry. You can specify at most one.");
+    if (passwordProvided && passwordFileProvided || passwordCommandProvided && passwordProvided || passwordCommandProvided && passwordFileProvided) {
+      p.addProblem(Severity.ERROR, "You have provided more than one of password, password command, or password file for your docker registry. You can specify at most one.");
       return;
     }
 
     if (passwordProvided) {
-      resolvedPassword = password;
+      resolvedPassword = secretSessionManager.decrypt(password);
     } else if (passwordFileProvided) {
-      resolvedPassword = ValidatingFileReader.contents(p, passwordFile);
+      resolvedPassword = validatingFileDecrypt(p, passwordFile);
       if (resolvedPassword == null) {
         return;
       }
 
       if (resolvedPassword.isEmpty()) {
         p.addProblem(Severity.WARNING, "The supplied password file is empty.");
+      }
+    } else if (passwordCommandProvided) {
+      try {
+        ProcessBuilder pb = new ProcessBuilder("bash", "-c", passwordCommand);
+        Process process = pb.start();
+        int errCode = process.waitFor();
+        log.debug("Full command is" + pb.command());
+
+        if (errCode != 0) {
+          String err = IOUtils.toString(process.getErrorStream());
+          log.error("Password command returned a non 0 return code, stderr/stdout was:" + err);
+          p.addProblem(Severity.WARNING, String.format("Password command returned non 0 return code, stderr/stdout was:" + err));
+        }
+
+        resolvedPassword = IOUtils.toString(process.getInputStream()).trim();
+
+        if (resolvedPassword.length() != 0) {
+          log.debug("resolvedPassword is" + resolvedPassword);
+        } else {
+          p.addProblem(Severity.WARNING, String.format("Resolved Password was empty, missing dependencies for running password command?"));
+        }
+
+      } catch(Exception e) {
+        p.addProblem(Severity.WARNING, String.format("Exception encountered when running password command: %s", e));
       }
     } else {
       resolvedPassword = "";
@@ -75,8 +110,9 @@ public class DockerRegistryAccountValidator extends Validator<DockerRegistryAcco
           .accountName(n.getName())
           .address(n.getAddress())
           .email(n.getEmail())
-          .password(n.getPassword())
-          .passwordFile(n.getPasswordFile())
+          .password(secretSessionManager.decrypt(n.getPassword()))
+          .passwordCommand(n.getPasswordCommand())
+          .passwordFile(secretSessionManager.decryptAsFile(n.getPasswordFile()))
           .dockerconfigFile(n.getDockerconfigFile())
           .username(n.getUsername())
           .clientTimeoutMillis(n.getClientTimeoutMillis())
@@ -85,6 +121,7 @@ public class DockerRegistryAccountValidator extends Validator<DockerRegistryAcco
           .sortTagsByDate(n.getSortTagsByDate())
           .trackDigests(n.getTrackDigests())
           .insecureRegistry(n.getInsecureRegistry())
+          .dockerOkClientProvider(new DefaultDockerOkClientProvider())
           .build();
     } catch (Exception e) {
       p.addProblem(Severity.ERROR, "Failed to instantiate docker credentials for account \"" + n.getName() + "\".");
@@ -109,17 +146,26 @@ public class DockerRegistryAccountValidator extends Validator<DockerRegistryAcco
         authFailureProblem = p.addProblem(Severity.ERROR, "Unable to connect the registries catalog endpoint: " + e.getMessage() + ".");
       }
     } else {
-      try {
-        // effectively final
-        int tagCount[] = new int[1];
-        tagCount[0] = 0;
-        n.getRepositories().forEach(r -> tagCount[0] += credentials.getCredentials().getClient().getTags(r).getTags().size());
-        if (tagCount[0] == 0) {
-          p.addProblem(Severity.WARNING, "None of your supplied repositories contain any tags. Spinnaker will not be able to deploy anything.")
-              .setRemediation("Push some images to your registry.");
+      // effectively final
+      int tagCount[] = new int[1];
+      tagCount[0] = 0;
+      n.getRepositories().forEach(r -> {
+          try {
+            tagCount[0] += credentials
+              .getCredentials()
+              .getClient()
+              .getTags(r)
+              .getTags()
+              .size();
+          } catch (Exception e) {
+            p.addProblem(Severity.ERROR, "Unable to fetch tags from the docker repository: " + r + ", " + e.getMessage())
+              .setRemediation("Can the provided user access this repository?");
+          }
         }
-      } catch (Exception e) {
-        authFailureProblem = p.addProblem(Severity.ERROR, "Unable to reach repository: " +  e.getMessage() + ".");
+      );
+      if (tagCount[0] == 0) {
+        p.addProblem(Severity.WARNING, "None of your supplied repositories contain any tags. Spinnaker will not be able to deploy any docker images.")
+          .setRemediation("Push some images to your registry.");
       }
     }
 

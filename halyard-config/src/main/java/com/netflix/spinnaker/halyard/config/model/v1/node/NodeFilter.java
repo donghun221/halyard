@@ -16,17 +16,12 @@
 
 package com.netflix.spinnaker.halyard.config.model.v1.node;
 
+import com.netflix.spinnaker.halyard.config.model.v1.artifacts.ArtifactTemplate;
 import com.netflix.spinnaker.halyard.config.model.v1.canary.Canary;
-import com.netflix.spinnaker.halyard.config.model.v1.security.ApacheSsl;
-import com.netflix.spinnaker.halyard.config.model.v1.security.ApiSecurity;
-import com.netflix.spinnaker.halyard.config.model.v1.security.Authn;
-import com.netflix.spinnaker.halyard.config.model.v1.security.AuthnMethod;
-import com.netflix.spinnaker.halyard.config.model.v1.security.Authz;
-import com.netflix.spinnaker.halyard.config.model.v1.security.GroupMembership;
-import com.netflix.spinnaker.halyard.config.model.v1.security.RoleProvider;
-import com.netflix.spinnaker.halyard.config.model.v1.security.Security;
-import com.netflix.spinnaker.halyard.config.model.v1.security.SpringSsl;
-import com.netflix.spinnaker.halyard.config.model.v1.security.UiSecurity;
+import com.netflix.spinnaker.halyard.config.model.v1.ha.HaService;
+import com.netflix.spinnaker.halyard.config.model.v1.ha.HaServices;
+import com.netflix.spinnaker.halyard.config.model.v1.security.*;
+import com.netflix.spinnaker.halyard.config.model.v1.webook.WebhookTrust;
 import lombok.Data;
 
 import java.util.ArrayList;
@@ -104,6 +99,16 @@ public class NodeFilter implements Cloneable {
     return this;
   }
 
+  public NodeFilter withAnyPublisher() {
+    matchers.add(Node.thisNodeAcceptor(Publisher.class));
+    return this;
+  }
+
+  public NodeFilter setPublisher(String name) {
+    matchers.add(Node.namedNodeAcceptor(Publisher.class, name));
+    return this;
+  }
+
   public NodeFilter withAnyPubsub() {
     matchers.add(Node.thisNodeAcceptor(Pubsubs.class));
     matchers.add(Node.thisNodeAcceptor(Pubsub.class));
@@ -175,6 +180,18 @@ public class NodeFilter implements Cloneable {
 
   public NodeFilter setDeploymentEnvironment() {
     matchers.add(Node.thisNodeAcceptor(DeploymentEnvironment.class));
+    return this;
+  }
+
+  public NodeFilter withAnyHaService() {
+    matchers.add(Node.thisNodeAcceptor(HaServices.class));
+    matchers.add(Node.thisNodeAcceptor(HaService.class));
+    return this;
+  }
+
+  public NodeFilter setHaService(String name) {
+    matchers.add(Node.thisNodeAcceptor(HaServices.class));
+    matchers.add(Node.namedNodeAcceptor(HaService.class, name));
     return this;
   }
 
@@ -270,6 +287,34 @@ public class NodeFilter implements Cloneable {
 
   public NodeFilter setCanary() {
     matchers.add(Node.thisNodeAcceptor(Canary.class));
+    return this;
+  }
+
+  public NodeFilter setWebhook() {
+    matchers.add(Node.thisNodeAcceptor(Webhook.class));
+    return this;
+  }
+
+  public NodeFilter setWebhookTrust() {
+    matchers.add(Node.thisNodeAcceptor(Webhook.class));
+    matchers.add(Node.thisNodeAcceptor(WebhookTrust.class));
+    return this;
+  }
+
+  public NodeFilter setArtifacts() {
+    matchers.add(Node.thisNodeAcceptor(Artifacts.class));
+    return this;
+  }
+
+  public NodeFilter withAnyArtifactTemplate() {
+    matchers.add(Node.thisNodeAcceptor(Artifacts.class));
+    matchers.add(Node.thisNodeAcceptor(ArtifactTemplate.class));
+    return this;
+  }
+
+  public NodeFilter setArtifactTemplate(String name) {
+    matchers.add(Node.thisNodeAcceptor(Artifacts.class));
+    matchers.add(Node.namedNodeAcceptor(ArtifactTemplate.class, name));
     return this;
   }
 

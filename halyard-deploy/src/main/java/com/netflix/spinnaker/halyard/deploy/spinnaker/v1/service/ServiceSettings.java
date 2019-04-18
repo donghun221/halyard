@@ -20,6 +20,7 @@ package com.netflix.spinnaker.halyard.deploy.spinnaker.v1.service;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.netflix.spinnaker.halyard.core.error.v1.HalException;
 import com.netflix.spinnaker.halyard.core.problem.v1.Problem;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.client.utils.URIBuilder;
@@ -29,6 +30,7 @@ import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * These are the attributes of a service that can conceivably change between deployments to the exact same deployment
@@ -62,8 +64,19 @@ public class ServiceSettings {
   Boolean safeToUpdate;
   Integer targetSize;
   Boolean skipLifeCycleManagement;
+  String baseUrl;
 
-  public ServiceSettings() { }
+  public ServiceSettings() {}
+
+  public ServiceSettings(String baseUrl) {
+    this.enabled = true;
+    this.baseUrl = baseUrl;
+    this.kubernetes = null;
+  }
+
+  public ServiceSettings withOnlyBaseUrl() {
+    return new ServiceSettings(getBaseUrl());
+  }
 
   void mergePreferThis(ServiceSettings other) {
     Arrays.stream(getClass().getDeclaredMethods()).forEach(m -> {
@@ -98,30 +111,18 @@ public class ServiceSettings {
     this.setEnv(fullEnvironment);
   }
 
-  private URIBuilder buildBaseUri() {
-    if (StringUtils.isEmpty(overrideBaseUrl)) {
-      return new URIBuilder()
-          .setScheme(getScheme())
-          .setPort(getPort())
-          .setHost(getAddress());
-    } else {
-      try {
-        return new URIBuilder(overrideBaseUrl);
-      } catch (URISyntaxException e) {
-        throw new HalException(Problem.Severity.FATAL, "Illegal override baseURL: " + overrideBaseUrl, e);
-      }
-    }
+  public String getBaseUrl() {
+    return buildBaseUri()
+        .map(b -> b.toString())
+        .orElse(null);
   }
 
   @JsonIgnore
   public String getAuthBaseUrl() {
     return buildBaseUri()
+        .get()
         .setUserInfo(getUsername(), getPassword())
         .toString();
-  }
-
-  public String getBaseUrl() {
-    return buildBaseUri().toString();
   }
 
   @JsonIgnore
@@ -141,5 +142,42 @@ public class ServiceSettings {
     } catch (URISyntaxException e) {
       throw new HalException(Problem.Severity.FATAL, "Could not build metrics endpoint. This is probably a bug.", e);
     }
+  }
+
+  private Optional<URIBuilder> buildBaseUri() {
+    if (!StringUtils.isBlank(overrideBaseUrl)) {
+      try {
+        return Optional.of(new URIBuilder(overrideBaseUrl));
+      } catch (URISyntaxException e) {
+        throw new HalException(Problem.Severity.FATAL, "Illegal override baseURL: " + overrideBaseUrl, e);
+      }
+    }
+    if (!StringUtils.isBlank(baseUrl)) {
+      try {
+        return Optional.of(new URIBuilder(baseUrl));
+      } catch (URISyntaxException e) {
+        throw new HalException(Problem.Severity.FATAL, "Illegal baseURL: " + baseUrl, e);
+      }
+    }
+    if (getScheme() != null && getPort() != null && getAddress() != null) {
+      return Optional.of(new URIBuilder()
+          .setScheme(getScheme())
+          .setPort(getPort())
+          .setHost(getAddress()));
+    }
+    return Optional.empty();
+  }
+
+  public SlimServiceSettings slim() {
+    return new SlimServiceSettings(getHost(), getPort(), getBaseUrl(), getEnabled());
+  }
+
+  @Data
+  @AllArgsConstructor
+  public static class SlimServiceSettings {
+    private String host;
+    private Integer port;
+    private String baseUrl;
+    private Boolean enabled;
   }
 }

@@ -21,8 +21,12 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.netflix.spinnaker.halyard.config.model.v1.node.MetricStore;
 import com.netflix.spinnaker.halyard.config.model.v1.node.MetricStores;
+import com.netflix.spinnaker.halyard.config.model.v1.node.Secret;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -35,9 +39,14 @@ public class DatadogStore extends MetricStore {
   @JsonIgnore
   private MetricStores.MetricStoreType metricStoreType = MetricStores.MetricStoreType.DATADOG;
 
+  @Secret(alwaysDecrypt = true)
   @JsonProperty("api_key")
   private String apiKey;
 
+  @Secret(alwaysDecrypt = true)
   @JsonProperty("app_key")
   private String appKey;
+
+  @JsonProperty("tags")
+  private List<String> tags = new ArrayList<>();
 }

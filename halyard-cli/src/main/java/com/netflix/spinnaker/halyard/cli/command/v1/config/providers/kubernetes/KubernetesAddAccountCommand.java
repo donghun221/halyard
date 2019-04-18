@@ -120,6 +120,27 @@ public class KubernetesAddAccountCommand extends AbstractAddAccountCommand {
   )
   public String skin;
 
+  @Parameter(
+      names = "--only-spinnaker-managed",
+      arity = 1,
+      description = KubernetesCommandProperties.ONLY_SPINNAKER_MANAGED_DESCRIPTION
+  )
+  public Boolean onlySpinnakerManaged = false;
+
+  @Parameter(
+        names = "--check-permissions-on-startup",
+        arity = 1,
+        description = KubernetesCommandProperties.CHECK_PERMISSIONS_ON_STARTUP
+  )
+  public Boolean checkPermissionsOnStartup;
+
+  @Parameter(
+      names = "--live-manifest-calls",
+      arity = 1,
+      description = KubernetesCommandProperties.LIVE_MANIFEST_CALLS
+  )
+  public Boolean liveManifestCalls;
+
   @Override
   protected Account buildAccount(String accountName) {
     KubernetesAccount account = (KubernetesAccount) new KubernetesAccount().setName(accountName);
@@ -136,6 +157,9 @@ public class KubernetesAddAccountCommand extends AbstractAddAccountCommand {
     account.setOAuthScopes(oAuthScopes);
     account.setNamingStrategy(namingStrategy);
     account.setSkin(skin);
+    account.setOnlySpinnakerManaged(onlySpinnakerManaged);
+    account.setCheckPermissionsOnStartup(checkPermissionsOnStartup);
+    account.setLiveManifestCalls(liveManifestCalls);
     return account;
   }
 
